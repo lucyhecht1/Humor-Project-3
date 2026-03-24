@@ -3,12 +3,12 @@
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getFlavorSteps } from "@/lib/queries/flavors";
 import { createClient } from "@/lib/supabase/server";
-import { uploadAndRegisterImage, generateCaptions } from "@/lib/api/runPipeline";
+import { registerImageUrl, generateCaptions, extractCaptionText } from "@/lib/api/runPipeline";
 import type { HumorFlavorStep } from "@/lib/schema";
 import type { Caption } from "@/lib/api/runPipeline";
 
 // ---------------------------------------------------------------------------
-// Fetch steps for the runner (reuses existing query)
+// Fetch steps for the runner
 // ---------------------------------------------------------------------------
 
 export async function getStepsForRunner(
@@ -25,14 +25,14 @@ export async function getStepsForRunner(
 }
 
 // ---------------------------------------------------------------------------
-// Stage 1: Upload image to S3 and register with the pipeline
+// Step 1 — Register image URL
 // ---------------------------------------------------------------------------
 
-export type PrepareImageResult =
-  | { imageId: string; cdnUrl: string }
+export type RegisterImageActionResult =
+  | { imageId: string }
   | { error: string };
 
-export async function prepareImage(imageUrl: string): Promise<PrepareImageResult> {
+export async function runRegisterImage(imageUrl: string): Promise<RegisterImageActionResult> {
   const session = await requireAdmin();
   if (!session) return { error: "Unauthorized" };
 
@@ -41,19 +41,19 @@ export async function prepareImage(imageUrl: string): Promise<PrepareImageResult
   if (!authSession?.access_token) return { error: "No active session" };
 
   try {
-    const result = await uploadAndRegisterImage(imageUrl, authSession.access_token);
-    return result;
+    const { imageId } = await registerImageUrl(imageUrl, authSession.access_token);
+    return { imageId };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to upload image" };
+    return { error: e instanceof Error ? e.message : "Failed to register image" };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Stage 2: Generate captions for a registered image
+// Step 2 — Generate captions
 // ---------------------------------------------------------------------------
 
 export type GenerateCaptionsResult =
-  | { captions: Caption[] }
+  | { captions: string[]; raw: Caption[] }
   | { error: string };
 
 export async function runGenerateCaptions(
@@ -68,8 +68,9 @@ export async function runGenerateCaptions(
   if (!authSession?.access_token) return { error: "No active session" };
 
   try {
-    const captions = await generateCaptions(imageId, humorFlavorId, authSession.access_token);
-    return { captions };
+    const raw = await generateCaptions(imageId, humorFlavorId, authSession.access_token);
+    const captions = raw.map(extractCaptionText).filter((t): t is string => t !== null);
+    return { captions, raw };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to generate captions" };
   }

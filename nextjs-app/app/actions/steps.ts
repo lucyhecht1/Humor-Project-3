@@ -7,6 +7,7 @@ import { tables, cols } from "@/lib/schema";
 
 export type StepActionResult = { error: string } | undefined;
 
+
 export async function createStep(
   flavorId: number,
   formData: FormData
@@ -19,16 +20,26 @@ export async function createStep(
 
   const orderBy = Number(formData.get("orderBy"));
   const llmUserPrompt = (formData.get("llmUserPrompt") as string)?.trim() || null;
-  const llmSystemPrompt =
-    (formData.get("llmSystemPrompt") as string)?.trim() || null;
+  const llmSystemPrompt = (formData.get("llmSystemPrompt") as string)?.trim() || null;
+  const llmModelId = formData.get("llmModelId") ? Number(formData.get("llmModelId")) : null;
+  const llmInputTypeId = formData.get("llmInputTypeId") ? Number(formData.get("llmInputTypeId")) : null;
+  const llmOutputTypeId = formData.get("llmOutputTypeId") ? Number(formData.get("llmOutputTypeId")) : null;
+  const humorFlavorStepTypeId = formData.get("humorFlavorStepTypeId") ? Number(formData.get("humorFlavorStepTypeId")) : null;
 
   if (!orderBy || orderBy < 1) return { error: "Step order must be a positive number" };
+  if (!llmInputTypeId) return { error: "Input type ID is required" };
+  if (!llmOutputTypeId) return { error: "Output type ID is required" };
+  if (!llmModelId) return { error: "Model ID is required" };
 
   const { error } = await supabase.from(tables.humorFlavorSteps).insert({
     [c.humorFlavorId]: flavorId,
     [c.orderBy]: orderBy,
     [c.llmUserPrompt]: llmUserPrompt,
     [c.llmSystemPrompt]: llmSystemPrompt,
+    [c.llmModelId]: llmModelId,
+    [c.llmInputTypeId]: llmInputTypeId,
+    [c.llmOutputTypeId]: llmOutputTypeId,
+    [c.humorFlavorStepTypeId]: humorFlavorStepTypeId,
     [c.createdByUserId]: session.userId,
   });
 
@@ -50,10 +61,16 @@ export async function updateStep(
 
   const orderBy = Number(formData.get("orderBy"));
   const llmUserPrompt = (formData.get("llmUserPrompt") as string)?.trim() || null;
-  const llmSystemPrompt =
-    (formData.get("llmSystemPrompt") as string)?.trim() || null;
+  const llmSystemPrompt = (formData.get("llmSystemPrompt") as string)?.trim() || null;
+  const llmModelId = formData.get("llmModelId") ? Number(formData.get("llmModelId")) : null;
+  const llmInputTypeId = formData.get("llmInputTypeId") ? Number(formData.get("llmInputTypeId")) : null;
+  const llmOutputTypeId = formData.get("llmOutputTypeId") ? Number(formData.get("llmOutputTypeId")) : null;
+  const humorFlavorStepTypeId = formData.get("humorFlavorStepTypeId") ? Number(formData.get("humorFlavorStepTypeId")) : null;
 
   if (!orderBy || orderBy < 1) return { error: "Step order must be a positive number" };
+  if (!llmInputTypeId) return { error: "Input type ID is required" };
+  if (!llmOutputTypeId) return { error: "Output type ID is required" };
+  if (!llmModelId) return { error: "Model ID is required" };
 
   const { error } = await supabase
     .from(tables.humorFlavorSteps)
@@ -61,6 +78,10 @@ export async function updateStep(
       [c.orderBy]: orderBy,
       [c.llmUserPrompt]: llmUserPrompt,
       [c.llmSystemPrompt]: llmSystemPrompt,
+      [c.llmModelId]: llmModelId,
+      [c.llmInputTypeId]: llmInputTypeId,
+      [c.llmOutputTypeId]: llmOutputTypeId,
+      [c.humorFlavorStepTypeId]: humorFlavorStepTypeId,
       [c.modifiedByUserId]: session.userId,
       [c.modifiedAt]: new Date().toISOString(),
     })

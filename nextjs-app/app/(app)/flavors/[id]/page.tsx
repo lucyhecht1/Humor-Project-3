@@ -1,8 +1,11 @@
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getFlavor, getFlavorSteps } from "@/lib/queries/flavors";
+import { listStepTypes } from "@/lib/queries/stepTypes";
+import { listInputTypes, listOutputTypes, listModels } from "@/lib/queries/llmTypes";
+import { getCaptionsForFlavor } from "@/lib/queries/captions";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { StepsClient } from "./_components/steps-client";
+import { FlavorDetailTabs } from "./_components/flavor-detail-tabs";
 
 export default async function FlavorDetailPage({
   params,
@@ -15,9 +18,14 @@ export default async function FlavorDetailPage({
   const { id } = await params;
   const flavorId = Number(id);
 
-  const [flavor, steps] = await Promise.all([
+  const [flavor, steps, stepTypes, inputTypes, outputTypes, models, captionsData] = await Promise.all([
     getFlavor(flavorId),
     getFlavorSteps(flavorId),
+    listStepTypes(),
+    listInputTypes(),
+    listOutputTypes(),
+    listModels(),
+    getCaptionsForFlavor(flavorId),
   ]);
 
   if (!flavor) notFound();
@@ -51,10 +59,16 @@ export default async function FlavorDetailPage({
         </p>
       </div>
 
-      {/* ── Steps ─────────────────────────────────────── */}
-      <div className="mt-8">
-        <StepsClient flavor={flavor} steps={steps} />
-      </div>
+      {/* ── Tabs: Steps + Captions ────────────────────── */}
+      <FlavorDetailTabs
+        flavor={flavor}
+        steps={steps}
+        stepTypes={stepTypes}
+        inputTypes={inputTypes}
+        outputTypes={outputTypes}
+        models={models}
+        captionsData={captionsData}
+      />
     </div>
   );
 }

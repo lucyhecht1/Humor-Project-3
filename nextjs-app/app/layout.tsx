@@ -23,8 +23,11 @@ export const metadata: Metadata = {
 const themeInitScript = `(function(){
   try {
     var t = localStorage.getItem('theme');
-    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (t === 'dark' || ((!t || t === 'system') && prefersDark)) {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   } catch {}
 })();`;

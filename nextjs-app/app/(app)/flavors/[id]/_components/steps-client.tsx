@@ -2,11 +2,16 @@
 
 import { useTransition, useState, useRef, useEffect } from "react";
 import { createStep, updateStep, deleteStep, reorderStep } from "@/app/actions/steps";
-import type { HumorFlavor, HumorFlavorStep } from "@/lib/schema";
+import type { HumorFlavor, HumorFlavorStep, HumorFlavorStepType } from "@/lib/schema";
+import type { LlmInputType, LlmOutputType, LlmModel } from "@/lib/queries/llmTypes";
 
 interface Props {
   flavor: HumorFlavor;
   steps: HumorFlavorStep[];
+  stepTypes: HumorFlavorStepType[];
+  inputTypes: LlmInputType[];
+  outputTypes: LlmOutputType[];
+  models: LlmModel[];
 }
 
 type DialogMode =
@@ -15,7 +20,7 @@ type DialogMode =
   | { type: "delete"; step: HumorFlavorStep }
   | null;
 
-export function StepsClient({ flavor, steps }: Props) {
+export function StepsClient({ flavor, steps, stepTypes = [], inputTypes = [], outputTypes = [], models = [] }: Props) {
   const [dialog, setDialog] = useState<DialogMode>(null);
   const [isReordering, startReorder] = useTransition();
   const [reorderingId, setReorderingId] = useState<number | null>(null);
@@ -103,6 +108,10 @@ export function StepsClient({ flavor, steps }: Props) {
         <StepFormDialog
           flavorId={flavor.id}
           defaultOrder={nextOrder}
+          stepTypes={stepTypes}
+          inputTypes={inputTypes}
+          outputTypes={outputTypes}
+          models={models}
           onClose={close}
         />
       )}
@@ -110,6 +119,10 @@ export function StepsClient({ flavor, steps }: Props) {
         <StepFormDialog
           flavorId={flavor.id}
           step={dialog.step}
+          stepTypes={stepTypes}
+          inputTypes={inputTypes}
+          outputTypes={outputTypes}
+          models={models}
           onClose={close}
         />
       )}
@@ -240,6 +253,10 @@ interface StepFormDialogProps {
   flavorId: number;
   step?: HumorFlavorStep;
   defaultOrder?: number;
+  stepTypes: HumorFlavorStepType[];
+  inputTypes: LlmInputType[];
+  outputTypes: LlmOutputType[];
+  models: LlmModel[];
   onClose: () => void;
 }
 
@@ -247,6 +264,10 @@ function StepFormDialog({
   flavorId,
   step,
   defaultOrder = 1,
+  stepTypes,
+  inputTypes,
+  outputTypes,
+  models,
   onClose,
 }: StepFormDialogProps) {
   const isEdit = !!step;
@@ -276,17 +297,84 @@ function StepFormDialog({
   return (
     <Dialog title={isEdit ? "Edit Step" : "Add Step"} onClose={onClose}>
       <form action={handleSubmit} className="flex flex-col gap-4">
-        <Field label="Step order" required>
-          <input
-            ref={firstFieldRef}
-            name="orderBy"
-            type="number"
-            min={1}
-            required
-            defaultValue={step?.orderBy ?? defaultOrder}
-            className={inputCls + " w-24"}
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Step order" required>
+            <input
+              ref={firstFieldRef}
+              name="orderBy"
+              type="number"
+              min={1}
+              required
+              defaultValue={step?.orderBy ?? defaultOrder}
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Step type">
+            <select
+              name="humorFlavorStepTypeId"
+              defaultValue={step?.humorFlavorStepTypeId ?? ""}
+              className={inputCls}
+            >
+              <option value="">— none —</option>
+              {stepTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.slug}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Input type" required>
+            <select
+              name="llmInputTypeId"
+              required
+              defaultValue={step?.llmInputTypeId ?? ""}
+              className={inputCls}
+            >
+              <option value="" disabled>Select…</option>
+              {inputTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.slug} ({t.id})
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Output type" required>
+            <select
+              name="llmOutputTypeId"
+              required
+              defaultValue={step?.llmOutputTypeId ?? ""}
+              className={inputCls}
+            >
+              <option value="" disabled>Select…</option>
+              {outputTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.slug} ({t.id})
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Model" required>
+            <select
+              name="llmModelId"
+              required
+              defaultValue={step?.llmModelId ?? ""}
+              className={inputCls}
+            >
+              <option value="" disabled>Select…</option>
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.id})
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
 
         <Field label="System prompt" hint="optional — sets model behavior">
           <textarea
@@ -303,7 +391,7 @@ function StepFormDialog({
             name="llmUserPrompt"
             rows={6}
             defaultValue={step?.llmUserPrompt ?? ""}
-            placeholder="Write a caption for {{image_url}} that is {{previous_output}}…"
+            placeholder="Write a caption for {{image_url}}…"
             className={inputCls + " resize-y font-mono text-xs"}
           />
         </Field>

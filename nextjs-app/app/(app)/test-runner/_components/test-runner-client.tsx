@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getStepsForRunner, prepareImage, runGenerateCaptions } from "@/app/actions/runner";
+import { getStepsForRunner, runRegisterImage, runGenerateCaptions } from "@/app/actions/runner";
 import type { HumorFlavorSummary } from "@/lib/queries/flavors";
 import type { HumorFlavorStep } from "@/lib/schema";
 import type { Caption } from "@/lib/api/runPipeline";
@@ -13,17 +13,13 @@ interface Props {
 type RunStage = "idle" | "loading-steps" | "uploading" | "generating" | "done" | "error";
 type StageState = "idle" | "active" | "done" | "error";
 
-interface UploadDetails {
-  cdnUrl: string;
-  imageId: string;
-}
-
 export function TestRunnerClient({ flavors }: Props) {
   const [flavorId, setFlavorId] = useState<number | null>(null);
   const [steps, setSteps] = useState<HumorFlavorStep[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [runStage, setRunStage] = useState<RunStage>("idle");
-  const [uploadDetails, setUploadDetails] = useState<UploadDetails | null>(null);
+  const [imageId, setImageId] = useState<string | null>(null);
+  const [uploadDetails, setUploadDetails] = useState<{ imageId: string } | null>(null);
   const [captions, setCaptions] = useState<Caption[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -36,7 +32,7 @@ export function TestRunnerClient({ flavors }: Props) {
     setFlavorId(id);
     setSteps([]);
     setCaptions([]);
-    setUploadDetails(null);
+    setImageId(null);
     setRunStage("loading-steps");
     setErrorMsg(null);
     setExpandedSections({});
@@ -49,6 +45,10 @@ export function TestRunnerClient({ flavors }: Props) {
       setSteps(result);
       setRunStage("idle");
     }
+  }
+
+  async function prepareImage(url: string) {
+    return runRegisterImage(url);
   }
 
   async function handleRun() {
@@ -79,7 +79,7 @@ export function TestRunnerClient({ flavors }: Props) {
       return;
     }
 
-    setCaptions(captionResult.captions);
+    setCaptions(captionResult.raw);
     setExpandedSections({ upload: false, generate: true });
     setRunStage("done");
   }
@@ -248,7 +248,6 @@ export function TestRunnerClient({ flavors }: Props) {
                 {uploadDetails && (
                   <div className="flex flex-col gap-2">
                     <DetailRow label="Image ID" value={uploadDetails.imageId} mono />
-                    <DetailRow label="CDN URL" value={uploadDetails.cdnUrl} mono truncate />
                   </div>
                 )}
               </StageAccordion>
@@ -291,7 +290,7 @@ export function TestRunnerClient({ flavors }: Props) {
           </div>
           <div className="flex flex-col gap-4">
             {captions.map((c, i) => (
-              <CaptionCard key={c.id ?? i} caption={c} index={i} />
+              <CaptionCard key={c.id ?? i} caption={c as Caption} index={i} />
             ))}
           </div>
         </div>
@@ -485,7 +484,7 @@ function DetailRow({
 // ── Caption card ──────────────────────────────────────────────
 
 function CaptionCard({ caption, index }: { caption: Caption; index: number }) {
-  const text = caption.caption ?? caption.text ?? null;
+  const text = caption.content ?? caption.caption ?? caption.text ?? null;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
