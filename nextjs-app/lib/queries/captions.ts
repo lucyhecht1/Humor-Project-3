@@ -30,7 +30,7 @@ export async function getCaptionsForFlavor(
   const map = new Map<string, ImageWithCaptions>();
 
   for (const row of data ?? []) {
-    const img = row.images as { id: string; url: string } | null;
+    const img = (row.images as unknown) as { id: string; url: string } | null;
     if (!img?.url) continue;
 
     if (!map.has(img.id)) {

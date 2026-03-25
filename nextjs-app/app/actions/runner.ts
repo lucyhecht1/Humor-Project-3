@@ -3,7 +3,7 @@
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getFlavorSteps } from "@/lib/queries/flavors";
 import { createClient } from "@/lib/supabase/server";
-import { registerImageUrl, generateCaptions, extractCaptionText } from "@/lib/api/runPipeline";
+import { generatePresignedUrl, registerImageUrl, generateCaptions, extractCaptionText } from "@/lib/api/runPipeline";
 import type { HumorFlavorStep } from "@/lib/schema";
 import type { Caption } from "@/lib/api/runPipeline";
 
@@ -21,6 +21,29 @@ export async function getStepsForRunner(
     return await getFlavorSteps(flavorId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to load steps" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step 0 — Get presigned upload URL
+// ---------------------------------------------------------------------------
+
+export type GetPresignedUrlResult =
+  | { presignedUrl: string; cdnUrl: string }
+  | { error: string };
+
+export async function runGetPresignedUrl(contentType: string): Promise<GetPresignedUrlResult> {
+  const session = await requireAdmin();
+  if (!session) return { error: "Unauthorized" };
+
+  const supabase = await createClient();
+  const { data: { session: authSession } } = await supabase.auth.getSession();
+  if (!authSession?.access_token) return { error: "No active session" };
+
+  try {
+    return await generatePresignedUrl(contentType, authSession.access_token);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to get presigned URL" };
   }
 }
 

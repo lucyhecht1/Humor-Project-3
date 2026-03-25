@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { getStepsForRunner, runRegisterImage, runGenerateCaptions } from "@/app/actions/runner";
+import { useEffect, useRef, useState } from "react";
+import { getStepsForRunner, runGetPresignedUrl, runRegisterImage, runGenerateCaptions } from "@/app/actions/runner";
 import type { HumorFlavorSummary } from "@/lib/queries/flavors";
 import type { HumorFlavorStep } from "@/lib/schema";
 import type { Caption } from "@/lib/api/runPipeline";
@@ -16,13 +16,30 @@ type StageState = "idle" | "active" | "done" | "error";
 export function TestRunnerClient({ flavors }: Props) {
   const [flavorId, setFlavorId] = useState<number | null>(null);
   const [steps, setSteps] = useState<HumorFlavorStep[]>([]);
+  const [inputMode, setInputMode] = useState<"url" | "file">("url");
   const [imageUrl, setImageUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [runStage, setRunStage] = useState<RunStage>("idle");
   const [imageId, setImageId] = useState<string | null>(null);
   const [uploadDetails, setUploadDetails] = useState<{ imageId: string } | null>(null);
   const [captions, setCaptions] = useState<Caption[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  // Revoke object URL on unmount or when file changes
+  useEffect(() => {
+    return () => { if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
+
+  function pickFile(f: File) {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    setFile(f);
+    setFilePreviewUrl(URL.createObjectURL(f));
+  }
 
   function toggleSection(key: string) {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -47,21 +64,46 @@ export function TestRunnerClient({ flavors }: Props) {
     }
   }
 
-  async function prepareImage(url: string) {
-    return runRegisterImage(url);
-  }
-
   async function handleRun() {
-    if (!flavorId || !imageUrl.trim()) return;
+    if (!flavorId) return;
+    if (inputMode === "url" && !imageUrl.trim()) return;
+    if (inputMode === "file" && !file) return;
 
     setCaptions([]);
     setUploadDetails(null);
     setErrorMsg(null);
     setExpandedSections({});
 
-    // Stage 1
+    // Stage 1 — register image
     setRunStage("uploading");
-    const uploadResult = await prepareImage(imageUrl.trim());
+
+    let uploadResult: { imageId: string } | { error: string };
+
+    if (inputMode === "file" && file) {
+      // Get presigned URL
+      const presigned = await runGetPresignedUrl(file.type || "image/jpeg");
+      if ("error" in presigned) {
+        setErrorMsg(presigned.error);
+        setRunStage("error");
+        return;
+      }
+      // PUT bytes directly to S3
+      const putRes = await fetch(presigned.presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!putRes.ok) {
+        setErrorMsg(`File upload failed: ${putRes.status}`);
+        setRunStage("error");
+        return;
+      }
+      // Register from CDN URL
+      uploadResult = await runRegisterImage(presigned.cdnUrl);
+    } else {
+      uploadResult = await runRegisterImage(imageUrl.trim());
+    }
+
     if ("error" in uploadResult) {
       setErrorMsg(uploadResult.error);
       setRunStage("error");
@@ -84,9 +126,10 @@ export function TestRunnerClient({ flavors }: Props) {
     setRunStage("done");
   }
 
+  const hasInput = inputMode === "url" ? imageUrl.trim().length > 0 : file !== null;
   const canRun =
     flavorId !== null &&
-    imageUrl.trim().length > 0 &&
+    hasInput &&
     steps.length > 0 &&
     runStage !== "uploading" &&
     runStage !== "generating" &&
@@ -154,18 +197,72 @@ export function TestRunnerClient({ flavors }: Props) {
             )}
           </div>
 
-          {/* Image URL + preview side by side */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
-              Image URL
-            </label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500"
-            />
+          {/* Image input — URL or file */}
+          <div className="flex flex-col gap-2">
+            {/* Mode toggle */}
+            <div className="flex items-center gap-0 self-start rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-700 dark:bg-zinc-800">
+              {(["url", "file"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setInputMode(mode)}
+                  className={[
+                    "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                    inputMode === mode
+                      ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                      : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+                  ].join(" ")}
+                >
+                  {mode === "url" ? "URL" : "Upload"}
+                </button>
+              ))}
+            </div>
+
+            {inputMode === "url" ? (
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+              />
+            ) : (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f); }}
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f?.type.startsWith("image/")) pickFile(f);
+                  }}
+                  className={[
+                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
+                    isDragging
+                      ? "border-zinc-400 bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-800"
+                      : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-zinc-600",
+                  ].join(" ")}
+                >
+                  {file ? (
+                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{file.name}</p>
+                  ) : (
+                    <>
+                      <UploadIcon />
+                      <p className="text-sm text-zinc-400">Drop an image here or <span className="font-medium text-zinc-600 dark:text-zinc-300">browse</span></p>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Run */}
@@ -204,18 +301,20 @@ export function TestRunnerClient({ flavors }: Props) {
       </section>
 
       {/* ── Two-column: image preview + pipeline ────────────── */}
-      {(imageUrl || runStage !== "idle") && (
+      {(() => {
+        const previewSrc = inputMode === "file" ? filePreviewUrl : imageUrl;
+        return (previewSrc || runStage !== "idle") && (
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
 
           {/* Image preview */}
-          {imageUrl && (
+          {previewSrc && (
             <div className="shrink-0 lg:w-56">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-400">
                 Input image
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={imageUrl}
+                src={previewSrc}
                 alt="Input"
                 className="w-full rounded-xl border border-zinc-200 object-cover shadow-sm dark:border-zinc-800"
                 onError={(e) => {
@@ -232,6 +331,7 @@ export function TestRunnerClient({ flavors }: Props) {
 
           {/* Pipeline stages */}
           {(runStage !== "idle" && runStage !== "loading-steps") && (
+
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
                 Pipeline
@@ -275,7 +375,8 @@ export function TestRunnerClient({ flavors }: Props) {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Captions ────────────────────────────────────────── */}
       {runStage === "done" && captions.length > 0 && (
@@ -513,6 +614,15 @@ function CaptionCard({ caption, index }: { caption: Caption; index: number }) {
 }
 
 // ── Icons & spinner ───────────────────────────────────────────
+
+function UploadIcon() {
+  return (
+    <svg className="size-6 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 16V8M8 12l4-4 4 4" />
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+    </svg>
+  );
+}
 
 function PlayIcon() {
   return (

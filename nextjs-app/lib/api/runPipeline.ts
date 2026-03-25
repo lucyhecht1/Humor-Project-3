@@ -86,6 +86,33 @@ export function extractCaptionText(c: Caption): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Step 0 — Generate presigned upload URL
+// ---------------------------------------------------------------------------
+
+export interface PresignedUrlResult {
+  presignedUrl: string;
+  cdnUrl: string;
+}
+
+export async function generatePresignedUrl(
+  contentType: string,
+  accessToken: string
+): Promise<PresignedUrlResult> {
+  try {
+    return await post<PresignedUrlResult>(
+      "/pipeline/generate-presigned-url",
+      { contentType },
+      accessToken
+    );
+  } catch (e) {
+    throw new PipelineError(
+      "generate-presigned-url",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Step 1 — Register image URL
 // ---------------------------------------------------------------------------
 

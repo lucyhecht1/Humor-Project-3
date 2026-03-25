@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/actions/auth";
 import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme-toggle";
@@ -99,25 +99,61 @@ export function Shell({ email, children }: ShellProps) {
           {/* Spacer on desktop so right side stays right */}
           <span className="hidden lg:block" />
 
-          {/* User + sign-out */}
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {email}
-            </span>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+          {/* User avatar */}
+          <UserMenu email={email} />
         </header>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+    </div>
+  );
+}
+
+// ── User menu ─────────────────────────────────────────────────
+
+function UserMenu({ email }: { email: string | undefined }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const initial = email ? email[0].toUpperCase() : "?";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white transition-opacity hover:opacity-80 dark:bg-zinc-50 dark:text-zinc-900"
+        aria-label="User menu"
+      >
+        {initial}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+          {email && (
+            <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-700">
+              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{email}</p>
+            </div>
+          )}
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex w-full items-center px-4 py-2.5 text-sm text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700/60 dark:hover:text-zinc-50"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
