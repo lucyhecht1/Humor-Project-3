@@ -11,6 +11,7 @@ const primaryNav = [
 ];
 
 const referenceNav = [
+  { href: "/captions", label: "Captions", icon: <CaptionsIcon /> },
   { href: "/themes", label: "Themes", icon: <ThemesIcon /> },
   { href: "/step-types", label: "Step Types", icon: <StepTypesIcon /> },
   { href: "/flavor-steps", label: "Flavor Steps", icon: <FlavorStepsIcon /> },
@@ -172,6 +173,15 @@ function TestRunnerIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor">
       <path d="M5.5 3.5a.5.5 0 0 1 .765-.424l6 3.5a.5.5 0 0 1 0 .848l-6 3.5A.5.5 0 0 1 5.5 10.5v-7z" />
+    </svg>
+  );
+}
+
+function CaptionsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="12" height="9" rx="1.5" />
+      <path d="M5 7h6M5 10h4" />
     </svg>
   );
 }
