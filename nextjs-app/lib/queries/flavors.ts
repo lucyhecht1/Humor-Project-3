@@ -60,22 +60,36 @@ export type HumorFlavorStepWithFlavor = HumorFlavorStep & {
   flavorSlug: string | null;
 };
 
-export async function listAllSteps(): Promise<HumorFlavorStepWithFlavor[]> {
+export type PaginatedSteps = {
+  steps: HumorFlavorStepWithFlavor[];
+  total: number;
+};
+
+export async function listAllSteps(
+  page = 1,
+  pageSize = 50
+): Promise<PaginatedSteps> {
   const supabase = await createClient();
   const c = cols.humorFlavorSteps;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from(tables.humorFlavorSteps)
-    .select(`*, ${tables.humorFlavors}(${cols.humorFlavors.slug})`)
+    .select(`*, ${tables.humorFlavors}(${cols.humorFlavors.slug})`, { count: "exact" })
     .order(c.humorFlavorId, { ascending: true })
-    .order(c.orderBy, { ascending: true });
+    .order(c.orderBy, { ascending: true })
+    .range(from, to);
 
   if (error) throw new Error(error.message);
 
-  return (data as StepWithFlavorRow[]).map((row) => ({
-    ...toHumorFlavorStep(row),
-    flavorSlug: row.humor_flavors?.slug ?? null,
-  }));
+  return {
+    steps: (data as StepWithFlavorRow[]).map((row) => ({
+      ...toHumorFlavorStep(row),
+      flavorSlug: row.humor_flavors?.slug ?? null,
+    })),
+    total: count ?? 0,
+  };
 }
 
 export async function getFlavorSteps(

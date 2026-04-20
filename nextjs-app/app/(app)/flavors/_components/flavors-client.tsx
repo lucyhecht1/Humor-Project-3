@@ -6,6 +6,7 @@ import {
   createFlavor,
   updateFlavor,
   deleteFlavor,
+  duplicateFlavor,
 } from "@/app/actions/flavors";
 import type { HumorFlavorSummary } from "@/lib/queries/flavors";
 import type { HumorFlavor } from "@/lib/schema";
@@ -18,6 +19,7 @@ type DialogMode =
   | { type: "create" }
   | { type: "edit"; flavor: HumorFlavor }
   | { type: "delete"; flavor: HumorFlavor }
+  | { type: "duplicate"; flavor: HumorFlavor }
   | null;
 
 export function FlavorsClient({ flavors }: Props) {
@@ -96,6 +98,12 @@ export function FlavorsClient({ flavors }: Props) {
                 <td className="py-3.5">
                   <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <IconButton
+                      label="Duplicate"
+                      onClick={() => setDialog({ type: "duplicate", flavor: f })}
+                    >
+                      <DuplicateIcon />
+                    </IconButton>
+                    <IconButton
                       label="Edit"
                       onClick={() => setDialog({ type: "edit", flavor: f })}
                     >
@@ -123,6 +131,9 @@ export function FlavorsClient({ flavors }: Props) {
       )}
       {dialog?.type === "delete" && (
         <DeleteDialog flavor={dialog.flavor} onClose={close} />
+      )}
+      {dialog?.type === "duplicate" && (
+        <DuplicateDialog flavor={dialog.flavor} onClose={close} />
       )}
     </>
   );
@@ -248,6 +259,72 @@ function DeleteDialog({
           {isPending ? <><Spinner />Deleting…</> : "Delete"}
         </button>
       </div>
+    </Dialog>
+  );
+}
+
+// ── Duplicate dialog ──────────────────────────────────────────
+
+function DuplicateDialog({
+  flavor,
+  onClose,
+}: {
+  flavor: HumorFlavor;
+  onClose: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  function handleSubmit(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const result = await duplicateFlavor(
+        flavor.id,
+        formData.get("slug") as string
+      );
+      if (result?.error) setError(result.error);
+    });
+  }
+
+  return (
+    <Dialog title="Duplicate Flavor" onClose={onClose}>
+      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+        Choose a unique name for the copy of{" "}
+        <span className="font-mono font-medium text-zinc-900 dark:text-zinc-50">
+          {flavor.slug}
+        </span>
+        . All steps will be duplicated.
+      </p>
+      <form action={handleSubmit} className="flex flex-col gap-4">
+        <Field label="New name" hint="Used as the slug identifier" required>
+          <input
+            ref={inputRef}
+            name="slug"
+            type="text"
+            required
+            defaultValue={`${flavor.slug}-copy`}
+            placeholder="e.g. dry-wit-copy"
+            className={inputCls}
+          />
+        </Field>
+
+        {error && <InlineError message={error} />}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className={secondaryBtnCls}>
+            Cancel
+          </button>
+          <button type="submit" disabled={isPending} className={primaryBtnCls}>
+            {isPending ? <><Spinner />Duplicating…</> : "Duplicate"}
+          </button>
+        </div>
+      </form>
     </Dialog>
   );
 }
@@ -438,6 +515,14 @@ function EmptyIcon() {
     <svg className="size-5 text-zinc-400 dark:text-zinc-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="3" width="12" height="10" rx="1.5" />
       <path d="M5 6h6M5 9h4" />
+    </svg>
+  );
+}
+function DuplicateIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="5" width="8" height="9" rx="1.5" />
+      <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" />
     </svg>
   );
 }

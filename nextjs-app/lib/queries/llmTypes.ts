@@ -73,6 +73,8 @@ const MODEL_FALLBACK: LlmModel[] = [
   { id: 18, name: "GPT 5 Nano" },
   { id: 19, name: "OpenAI" },
   { id: 54, name: "Amdin model update" },
+  { id: 80, name: "1" },
+  { id: 86, name: "gpt-4.1" },
 ];
 
 export async function listModels(): Promise<LlmModel[]> {
