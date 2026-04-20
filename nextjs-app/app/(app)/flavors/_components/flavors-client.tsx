@@ -96,7 +96,7 @@ export function FlavorsClient({ flavors }: Props) {
                   )}
                 </td>
                 <td className="py-3.5">
-                  <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center justify-end gap-1">
                     <IconButton
                       label="Duplicate"
                       onClick={() => setDialog({ type: "duplicate", flavor: f })}
@@ -445,18 +445,23 @@ function IconButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      className={[
-        "rounded-md p-1.5 transition-colors",
-        variant === "danger"
-          ? "text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-          : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800",
-      ].join(" ")}
-    >
-      <span className="block size-3.5">{children}</span>
-    </button>
+    <div className="relative group/tip">
+      <button
+        onClick={onClick}
+        aria-label={label}
+        className={[
+          "rounded-md p-1.5 transition-colors",
+          variant === "danger"
+            ? "text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+            : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800",
+        ].join(" ")}
+      >
+        <span className="block size-3.5">{children}</span>
+      </button>
+      <div className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-zinc-900 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover/tip:opacity-100 dark:bg-zinc-700">
+        {label}
+      </div>
+    </div>
   );
 }
 
