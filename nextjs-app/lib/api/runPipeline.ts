@@ -73,7 +73,14 @@ async function post<T>(path: string, body: unknown, accessToken: string): Promis
   }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText);
+    const raw = await res.text().catch(() => "");
+    let detail = raw || res.statusText;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.message === "string") detail = parsed.message;
+    } catch {
+      // raw is not JSON, use as-is
+    }
     throw new Error(`${res.status}: ${detail}`);
   }
 

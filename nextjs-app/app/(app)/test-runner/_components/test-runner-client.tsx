@@ -291,12 +291,20 @@ export function TestRunnerClient({ flavors }: Props) {
             )}
           </div>
 
-          {errorMsg && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">
-              <ErrorIcon />
-              <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>
-            </div>
-          )}
+          {errorMsg && (() => {
+            const { summary, hint } = explainError(errorMsg);
+            return (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">
+                <ErrorIcon />
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm text-red-600 dark:text-red-400">{summary}</p>
+                  {hint && (
+                    <p className="text-xs text-red-500 dark:text-red-400">{hint}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </section>
 
@@ -611,6 +619,27 @@ function CaptionCard({ caption, index }: { caption: Caption; index: number }) {
       )}
     </div>
   );
+}
+
+// ── Error explanation ─────────────────────────────────────────
+
+const JSON_PARSE_PATTERNS = [
+  "Unterminated fractional number",
+  "Unexpected token",
+  "is not valid JSON",
+  "JSON at position",
+  "Unexpected end of JSON",
+  "SyntaxError",
+];
+
+function explainError(raw: string): { summary: string; hint?: string } {
+  if (JSON_PARSE_PATTERNS.some((p) => raw.includes(p))) {
+    return {
+      summary: "The LLM returned plain text instead of a JSON array.",
+      hint: 'Fix: edit the step\'s prompt template and add "Return a JSON array of strings, e.g. [\\"caption 1\\", \\"caption 2\\"]"',
+    };
+  }
+  return { summary: raw };
 }
 
 // ── Icons & spinner ───────────────────────────────────────────
